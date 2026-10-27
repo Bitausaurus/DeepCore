@@ -2783,7 +2783,7 @@ function dcRenderGraphene(){
 $('dcPrestige').addEventListener('click',()=>{
  if(!s.grapheneDefeated||!s.grapheneCore||s.prestiges>=10)return;
  if(!confirm('Passer au Prestige '+(s.prestiges+1)+' ? Profondeur, or, minerais et améliorations seront réinitialisés. Collections, pioches et bonus de noyaux activés seront conservés. Le noyau obtenu restera disponible.'))return;
- const retained={skins:s.skins.slice(),equippedSkin:s.equippedSkin,adamantiumOwned:s.adamantiumOwned,statuettes:s.statuettes.slice(),shinyStatuettes:s.shinyStatuettes.slice(),grapheneCore:s.grapheneCore,coreAwardedAtPrestige:s.coreAwardedAtPrestige,grapheneUsed:s.grapheneUsed,grapheneCoresUsed:s.grapheneCoresUsed,grapheneDefeated:false,prestiges:s.prestiges+1,rockCounts:{...s.rockCounts},achievementClaims:{...s.achievementClaims},profileTitle:s.profileTitle,profileNickname:s.profileNickname,profileHelmet:s.profileHelmet,profileArmor:s.profileArmor,profileSkin:s.profileSkin,goldenBag:{},ancientFragments:s.ancientFragments,specialRock:''};
+ const retained={skins:s.skins.slice(),equippedSkin:s.equippedSkin,adamantiumOwned:s.adamantiumOwned,statuettes:s.statuettes.slice(),shinyStatuettes:s.shinyStatuettes.slice(),grapheneCore:s.grapheneCore,coreAwardedAtPrestige:s.coreAwardedAtPrestige,grapheneUsed:s.grapheneUsed,grapheneCoresUsed:s.grapheneCoresUsed,grapheneDefeated:false,prestiges:s.prestiges+1,dcMaxDepthEver:Math.max(Number(s.dcMaxDepthEver)||0,Number(s.depth)||0),rockCounts:{...s.rockCounts},achievementClaims:{...s.achievementClaims},profileTitle:s.profileTitle,profileNickname:s.profileNickname,profileHelmet:s.profileHelmet,profileArmor:s.profileArmor,profileSkin:s.profileSkin,goldenBag:{},ancientFragments:s.ancientFragments,specialRock:''};
  s={coins:0,depth:0,pick:1,drill:0,luck:0,force:0,bag:{},rareBag:{},ore:0,hp:12,maxHp:12,blocks:0,...retained};
  dcLastOreArt=-1;dcLastInvSignature='';dcProbCache='';save();render(true);
  message('💠 PRESTIGE '+s.prestiges+' ! Noyau activable · Graphène de nouveau accessible à 10 000 m.');
@@ -2974,7 +2974,7 @@ for(const [id,key] of [['dcProfileHelmet','profileHelmet'],['dcProfileArmor','pr
 
 
 
-function nextBlock(){s.depth+=2;s.blocks++;if(s.prestiges>=10&&s.depth>10000&&s.depth%10000===0)s.grapheneDefeated=false;s.ore=s.depth>=10000&&!s.grapheneDefeated?8:(s.depth>0&&s.depth%1000===0?7:s.depth>0&&s.depth%100===0?6:chooseOre());s.specialRock=dcChooseSpecialRock(s.ore);s.maxHp=Math.max(1,Math.round(rockMaxHp(s.depth,s.ore)*(s.specialRock==='cracked'?.6:1)));s.hp=s.maxHp;message('Bloc détruit ! +1 '+(s.ore===8?'Graphène':ores[s.ore].name)+' à découvrir.');save()}let dcWeakX=.5,dcWeakY=.5,dcWeakClicks=0,dcWeakLimit=10;
+function nextBlock(){s.depth+=2;s.blocks++;s.dcMaxDepthEver=Math.max(Number(s.dcMaxDepthEver)||0,s.depth);if(s.prestiges>=10&&s.depth>10000&&s.depth%10000===0)s.grapheneDefeated=false;s.ore=s.depth>=10000&&!s.grapheneDefeated?8:(s.depth>0&&s.depth%1000===0?7:s.depth>0&&s.depth%100===0?6:chooseOre());s.specialRock=dcChooseSpecialRock(s.ore);s.maxHp=Math.max(1,Math.round(rockMaxHp(s.depth,s.ore)*(s.specialRock==='cracked'?.6:1)));s.hp=s.maxHp;message('Bloc détruit ! +1 '+(s.ore===8?'Graphène':ores[s.ore].name)+' à découvrir.');save()}let dcWeakX=.5,dcWeakY=.5,dcWeakClicks=0,dcWeakLimit=10;
 function dcMoveWeakspot(){
  dcWeakX=.26+Math.random()*.48;dcWeakY=.27+Math.random()*.46;
  const target=$('dcWeakspot');target.style.left=(dcWeakX*100)+'%';target.style.top=(dcWeakY*100)+'%';
@@ -3595,5 +3595,5 @@ for(const [canvas,which] of [[mini,'mini'],[large,'large']]){
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
 </script>
-<script type="module" src="deepcore-auth.js?v=20261027-3"></script>
+<script type="module" src="deepcore-auth.js?v=20261027-leaderboard-1"></script>
 </body></html>

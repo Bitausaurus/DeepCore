@@ -57,3 +57,86 @@ async function render(){
 }
 supabase.auth.onAuthStateChange(()=>{setTimeout(render,0);});
 render();
+
+
+// Classements DeepCore : une seule identité Google pour les trois catégories.
+// Les données locales sont déclaratives : sans validation serveur des actions de jeu,
+// ces classements ne constituent pas une protection anti-triche.
+const lbCss=document.createElement('style');
+lbCss.textContent=`
+#dc-leaderboard{position:relative;width:100%;min-width:0;font:12px system-ui,sans-serif;color:#f4d79f}
+#dc-leaderboard .dc-lb-open{width:100%;padding:9px 7px;border:1px solid #b88c49;border-radius:9px;background:linear-gradient(145deg,#273e52,#102639);color:#f6d69b;font-weight:700;cursor:pointer}
+#dc-leaderboard .dc-lb-panel[hidden]{display:none!important}
+#dc-leaderboard .dc-lb-panel{position:fixed;z-index:10050;inset:0;background:#020810c9;display:flex;align-items:center;justify-content:center;padding:14px;box-sizing:border-box}
+#dc-leaderboard .dc-lb-window{width:min(590px,100%);max-height:min(85vh,750px);overflow:auto;box-sizing:border-box;padding:16px;border:2px solid #b88c49;border-radius:14px;background:linear-gradient(155deg,#142a3c,#091421);box-shadow:0 12px 55px #000b}
+#dc-leaderboard .dc-lb-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+#dc-leaderboard .dc-lb-close{background:#263e55;border:1px solid #63758a;color:white;border-radius:7px;padding:5px 10px;cursor:pointer}
+#dc-leaderboard .dc-lb-tabs{display:flex;flex-wrap:wrap;gap:5px;margin:13px 0}
+#dc-leaderboard .dc-lb-tabs button{flex:1 1 auto;padding:8px 5px;background:#1a3045;border:1px solid #5e7184;border-radius:7px;color:#e5ecf4;cursor:pointer;font-size:11px}
+#dc-leaderboard .dc-lb-tabs button[aria-pressed=true]{background:#735328;border-color:#e8b55c;color:#fff}
+#dc-leaderboard .dc-lb-row{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:8px;align-items:center;padding:9px 5px;border-bottom:1px solid #ffffff20;color:#f2e4c7}
+#dc-leaderboard .dc-lb-row span:nth-child(2){overflow-wrap:anywhere}
+#dc-leaderboard .dc-lb-note{font-size:11px;color:#b4c6d5;line-height:1.45;margin-top:11px}
+`;document.head.append(lbCss);
+const lbRoot=document.createElement('section');lbRoot.id='dc-leaderboard';lbRoot.innerHTML=`<button type="button" class="dc-lb-open">🏆 Classements mondiaux</button><div class="dc-lb-panel" hidden role="dialog" aria-modal="true" aria-label="Classements mondiaux"><div class="dc-lb-window"><div class="dc-lb-top"><strong>🏆 Classements mondiaux</strong><button class="dc-lb-close" type="button">✕ Fermer</button></div><div class="dc-lb-tabs"><button data-lb="max_depth" aria-pressed="true">⛏️ Profondeur</button><button data-lb="max_prestige" aria-pressed="false">⭐ Prestiges</button><button data-lb="rocks_broken_total" aria-pressed="false">🪨 Roches</button></div><div class="dc-lb-results" aria-live="polite">Chargement…</div><div class="dc-lb-note">Classements en ligne : connexion Google nécessaire pour envoyer ses scores. Les statistiques sont issues des sauvegardes locales et ne sont pas encore vérifiées contre la triche.</div></div></div>`;
+if(sidebar){sidebar.insertBefore(lbRoot,panel.nextSibling);}else document.querySelector('main')?.prepend(lbRoot);
+const lbPanel=lbRoot.querySelector('.dc-lb-panel'),lbResults=lbRoot.querySelector('.dc-lb-results');
+let lbCategory='max_depth',lbBusy=false,lbLastSignature='';
+const lbFormat=n=>Math.floor(Number(n)||0).toLocaleString('fr-FR');
+const lbValue=(obj,key)=>Math.max(0,Math.floor(Number(obj?.[key])||0));
+const lbCompare=(a,b)=>a.prestige-b.prestige||a.depth-b.depth||a.rocks-b.rocks;
+function lbRead(){
+ try{
+  const s=JSON.parse(localStorage.getItem('deepcore_clicker_v1')||'null');if(!s||typeof s!=='object')return null;
+  const rocks=Object.values(s.rockCounts||{}).reduce((n,v)=>n+Math.max(0,Math.floor(Number(v)||0)),0);
+  return {prestige:lbValue(s,'prestiges'),depth:Math.max(lbValue(s,'depth'),lbValue(s,'dcMaxDepthEver')),rocks:Math.max(0,Math.floor(rocks))};
+ }catch{return null;}
+}
+function lbBest(){
+ const current=lbRead();if(!current)return null;
+ // L'archive du record reste locale au navigateur : on ne cumule pas des parties.
+ let old=null;try{old=JSON.parse(localStorage.getItem('deepcore_best_online_v1')||'null');}catch{}
+ const best=old&&lbCompare(old,current)>0?old:current;
+ try{localStorage.setItem('deepcore_best_online_v1',JSON.stringify(best));}catch{}
+ return best;
+}
+async function lbSubmit(){
+ if(lbBusy)return;
+ const best=lbBest();if(!best||!currentUser)return;
+ const signature=currentUser.id+':'+JSON.stringify(best);if(signature===lbLastSignature)return;
+ lbBusy=true;
+ try{
+  const {error}=await supabase.rpc('submit_deepcore_score',{p_rocks:best.rocks,p_depth:best.depth,p_prestige:best.prestige});
+  if(error){console.warn('DeepCore classement :',error.message);return;}
+  lbLastSignature=signature;
+ }finally{lbBusy=false;}
+}
+async function lbRefresh(){
+ lbResults.textContent='Chargement du classement…';
+ const category=lbCategory;
+ const {data:stats,error}=await supabase.from('player_stats').select('user_id,rocks_broken_total,max_depth,max_prestige').order(category,{ascending:false}).limit(20);
+ if(category!==lbCategory)return;
+ if(error){lbResults.textContent='Classement indisponible : '+error.message;return;}
+ if(!stats?.length){lbResults.textContent='Aucun score enregistré pour le moment.';return;}
+ const ids=stats.map(x=>x.user_id);
+ const {data:profiles}=await supabase.from('profiles').select('id,username').in('id',ids);
+ if(category!==lbCategory)return;
+ const names=new Map((profiles||[]).map(x=>[x.id,x.username]));
+ lbResults.replaceChildren();
+ stats.forEach((score,i)=>{
+  const line=document.createElement('div');line.className='dc-lb-row';
+  const rank=document.createElement('span');rank.textContent=i===0?'🥇':i===1?'🥈':i===2?'🥉':String(i+1)+'.';
+  const name=document.createElement('span');name.textContent=names.get(score.user_id)||'Joueur';
+  const val=document.createElement('strong');val.textContent=lbFormat(score[category])+(category==='max_depth'?' m':'');
+  line.append(rank,name,val);lbResults.append(line);
+ });
+}
+lbRoot.querySelector('.dc-lb-open').addEventListener('click',async()=>{lbPanel.hidden=false;await lbSubmit();await lbRefresh();});
+lbRoot.querySelector('.dc-lb-close').addEventListener('click',()=>{lbPanel.hidden=true;});
+lbPanel.addEventListener('click',e=>{if(e.target===lbPanel)lbPanel.hidden=true;});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')lbPanel.hidden=true;});
+for(const b of lbRoot.querySelectorAll('[data-lb]'))b.addEventListener('click',()=>{lbCategory=b.dataset.lb;for(const x of lbRoot.querySelectorAll('[data-lb]'))x.setAttribute('aria-pressed',String(x===b));lbRefresh();});
+// Publication espacée pour ne pas ralentir le minage ni saturer Supabase.
+setInterval(lbSubmit,30000);
+supabase.auth.onAuthStateChange(()=>{setTimeout(()=>{lbLastSignature='';lbSubmit();},1200);});
+setTimeout(lbSubmit,2500);
