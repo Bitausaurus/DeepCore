@@ -3216,14 +3216,18 @@ $('saveFile').addEventListener('change',async e=>{
   for(const key of ['coins','depth','pick','drill','luck','ore','hp','maxHp','blocks'])if(!Number.isFinite(p[key])||p[key]<0)throw new Error('Progression invalide');
   if(p.pick<1||p.ore>8||!Number.isInteger(p.ore)||p.hp>p.maxHp||p.maxHp<1||!p.bag||typeof p.bag!=='object'||!p.rareBag||typeof p.rareBag!=='object'||!Array.isArray(p.skins))throw new Error('Données de sauvegarde invalides');
   if(!confirm('Importer cette sauvegarde remplacera la progression actuelle. Continuer ?'))return;
-  const clean={coins:p.coins,depth:p.depth,pick:p.pick,drill:p.drill,luck:p.luck,ore:p.ore,hp:p.hp,maxHp:p.maxHp,blocks:p.blocks,bag:p.bag,rareBag:p.rareBag,skins:p.skins,equippedSkin:Number.isInteger(p.equippedSkin)?p.equippedSkin:-1};
-  localStorage.setItem(SAVE,JSON.stringify(clean));
+  // Restaurer l'intégralité de la progression dans l'état actif du jeu.
+  // Sans cela, les sauvegardes automatiques peuvent réécrire l'ancienne partie.
+  s={...s,...p,bag:p.bag,rareBag:p.rareBag,skins:p.skins};
+  localStorage.setItem(SAVE,JSON.stringify(s));
   if(payload.settings&&typeof payload.settings==='object'){
    if(typeof payload.settings.sound==='boolean')localStorage.setItem('deepcore_mute',payload.settings.sound?'0':'1');
    if(Number.isFinite(payload.settings.volume))localStorage.setItem('deepcore_volume',String(Math.max(0,Math.min(1,payload.settings.volume))));
    if(typeof payload.settings.musicEnabled==='boolean')localStorage.setItem('deepcore_music',payload.settings.musicEnabled?'1':'0');
   }
-  location.reload();
+  // Mettre l'interface à jour sans rechargement : l'état s reste cohérent.
+  render();
+  message('Sauvegarde restaurée : '+(s.depth*2).toLocaleString('fr-FR')+' m !');
  }catch(err){message('Import impossible : '+err.message);alert('Sauvegarde invalide : '+err.message)}
  finally{e.target.value=''}
 });
